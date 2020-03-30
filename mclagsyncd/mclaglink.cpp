@@ -49,6 +49,7 @@ void MclagLink::setPortIsolate(char *msg)
     vector<FieldValueTuple> acl_rule_attrs;
     string acl_key = string("") + APP_ACL_TABLE_TABLE_NAME + ":" + acl_name;
     string acl_rule_key = string("") + APP_ACL_RULE_TABLE_NAME + ":" + acl_rule_name;
+    static int acl_table_is_added = 0;
 
     cur = msg;
 
@@ -68,24 +69,29 @@ void MclagLink::setPortIsolate(char *msg)
     {
         /* If dst port is NULL, delete the acl table 'mclag' */
         m_aclTable.del(acl_name);
-        SWSS_LOG_DEBUG("Set port isolate, src port: %s, dst port is NULL", isolate_src_port.c_str());
+        acl_table_is_added = 0;
+        SWSS_LOG_NOTICE("Set port isolate, src port: %s, dst port is NULL", isolate_src_port.c_str());
         return;
     }
 
-    SWSS_LOG_DEBUG("Set port isolate, src port: %s, dst port: %s", isolate_src_port.c_str(), isolate_dst_port.c_str());
+    SWSS_LOG_NOTICE("Set port isolate, src port: %s, dst port: %s", isolate_src_port.c_str(), isolate_dst_port.c_str());
 
-    /* First create ACL table */
-    FieldValueTuple desc_attr("policy_desc", "Mclag egress port isolate acl");
-    acl_attrs.push_back(desc_attr);
+    if (acl_table_is_added == 0)
+    {
+        /* First create ACL table */
+        FieldValueTuple desc_attr("policy_desc", "Mclag egress port isolate acl");
+        acl_attrs.push_back(desc_attr);
 
-    FieldValueTuple type_attr("type", "L3");
-    acl_attrs.push_back(type_attr);
+        FieldValueTuple type_attr("type", "MCLAG");
+        acl_attrs.push_back(type_attr);
 
-    FieldValueTuple port_attr("ports", isolate_src_port);
-    acl_attrs.push_back(port_attr);
+        FieldValueTuple port_attr("ports", isolate_src_port);
+        acl_attrs.push_back(port_attr);
 
-    m_aclTable.set(acl_name, acl_attrs);
-    /* End create ACL table */
+        m_aclTable.set(acl_name, acl_attrs);
+        acl_table_is_added = 1;
+        /* End create ACL table */
+    }
 
     /* Then create ACL rule table */
     FieldValueTuple ip_type_attr("IP_TYPE", "ANY");
@@ -137,7 +143,7 @@ void MclagLink::setPortLearnMode(char *msg)
     else
         m_portTable.set(learn_port, attrs);
 
-    SWSS_LOG_DEBUG("Set port mac learn mode, port: %s, learn-mode: %s", learn_port.c_str(), learn_mode.c_str());
+    SWSS_LOG_NOTICE("Set port mac learn mode, port: %s, learn-mode: %s", learn_port.c_str(), learn_mode.c_str());
 
     return;
 }
@@ -148,7 +154,7 @@ void MclagLink::flushFdb()
 
     vector<FieldValueTuple> values;
 
-    SWSS_LOG_DEBUG("Send fdb flush notification");
+    SWSS_LOG_NOTICE("Send fdb flush notification");
 
     flushFdb.send("ALL", "ALL", values);
 
@@ -169,7 +175,7 @@ void MclagLink::flushFdbByPort(char *msg)
     cur = cur + MCLAG_SUB_OPTION_HDR_LEN;
     port.insert(0, (const char *)cur, op_hdr->op_len);
 
-    SWSS_LOG_DEBUG("Send fdb flush by port %s notification", port.c_str());
+    SWSS_LOG_NOTICE("Send fdb flush by port %s notification", port.c_str());
 
     flushFdb.send("ALL", port, values);
 
@@ -197,7 +203,7 @@ void MclagLink::setIntfMac(char *msg)
     cur = cur + MCLAG_SUB_OPTION_HDR_LEN;
     mac_value.insert(0, (const char *)cur, op_hdr->op_len);
 
-    SWSS_LOG_DEBUG("Set mac to chip, intf key name: %s, mac: %s", intf_key.c_str(), mac_value.c_str());
+    SWSS_LOG_NOTICE("Set mac to chip, intf key name: %s, mac: %s", intf_key.c_str(), mac_value.c_str());
     vector<FieldValueTuple> attrs;
     FieldValueTuple mac_attr("mac_addr", mac_value);
     attrs.push_back(mac_attr);
@@ -259,26 +265,26 @@ void MclagLink::setFdbEntry(char *msg, int msg_len)
             if (exist == 0)
             {
                 m_pFdbSet->insert(fdb);
-                SWSS_LOG_DEBUG("Insert node(portname =%s, mac =%s, vid =%d, type =%s) into fdb_set",
+                SWSS_LOG_NOTICE("Insert node(portname =%s, mac =%s, vid =%d, type =%s) into fdb_set",
                                fdb.port_name.c_str(), fdb.mac.c_str(), fdb.vid, fdb.type.c_str());
             }
             else
             {
                 if (it->port_name == fdb.port_name && it->type == fdb.type)
                 {
-                    SWSS_LOG_DEBUG("Insert node(portname =%s, mac =%s, vid =%d, type =%s), all the same",
+                    SWSS_LOG_NOTICE("Insert node(portname =%s, mac =%s, vid =%d, type =%s), all the same",
                                    fdb.port_name.c_str(), fdb.mac.c_str(), fdb.vid, fdb.type.c_str());
                     continue;
                 }
 
-                SWSS_LOG_DEBUG("Modify node(mac =%s, vid =%d, portname :%s==>%s, type:%s==>%s)",
+                SWSS_LOG_NOTICE("Modify node(mac =%s, vid =%d, portname :%s==>%s, type:%s==>%s)",
                                fdb.mac.c_str(), fdb.vid, it->port_name.c_str(), fdb.port_name.c_str(), it->type.c_str(), fdb.type.c_str());
                 m_pFdbSet->erase(it);
                 m_pFdbSet->insert(fdb);
             }
 
             m_fdbTable.set(fdb_key, attrs);
-            SWSS_LOG_DEBUG("Add fdb entry into ASIC_DB:key =%s, type =%s", fdb_key.c_str(), fdb.type.c_str());
+            SWSS_LOG_NOTICE("Add fdb entry into ASIC_DB:key =%s, type =%s", fdb_key.c_str(), fdb.type.c_str());
         }
         else if (fdb_info->op_type == MCLAG_FDB_OPER_DEL)
         {
@@ -286,7 +292,7 @@ void MclagLink::setFdbEntry(char *msg, int msg_len)
             {
                 m_pFdbSet->erase(it);
                 m_fdbTable.del(fdb_key);
-                SWSS_LOG_DEBUG("Del fdb entry from ASIC_DB:key =%s", fdb_key.c_str());
+                SWSS_LOG_NOTICE("Del fdb entry from ASIC_DB:key =%s", fdb_key.c_str());
             }
         }
     }
@@ -313,7 +319,7 @@ void MclagLink::notifyFdbChange()
             msg_head->msg_len = (unsigned short)info_len;
             msg_head->msg_type = MCLAG_SYNCD_MSG_TYPE_FDB_OPERATION;
 
-            SWSS_LOG_DEBUG("Mclagsycnd send msg to iccpd, msg_len =%d, msg_type =%d", msg_head->msg_len, msg_head->msg_type);
+            SWSS_LOG_NOTICE("Mclagsycnd send msg to iccpd, msg_len =%d, msg_type =%d", msg_head->msg_len, msg_head->msg_type);
 
             write =::write(m_connectionSocket, info_start, msg_head->msg_len);
             if (write < 0)
@@ -325,7 +331,7 @@ void MclagLink::notifyFdbChange()
             info_len = sizeof(mclag_msg_hdr_t);
         }
 
-        SWSS_LOG_DEBUG("Notify fdb msg(mac:%s, vid:%d, portname:%s, type:%s, op_type:%s) to iccpd.",
+        SWSS_LOG_NOTICE("Notify fdb msg(mac:%s, vid:%d, portname:%s, type:%s, op_type:%s) to iccpd.",
                        it->mac.c_str(), it->vid, it->port_name.c_str(), it->type.c_str(), (it->op_type == MCLAG_FDB_OPER_ADD) ? "add" : "del");
 
         memset(&info, 0, sizeof(struct mclag_fdb_info));
@@ -351,7 +357,7 @@ void MclagLink::notifyFdbChange()
     msg_head->msg_len = (unsigned short)info_len;
     msg_head->msg_type = MCLAG_SYNCD_MSG_TYPE_FDB_OPERATION;
 
-    /* SWSS_LOG_DEBUG("Mclagsycnd send msg to iccpd, msg_len =%d, msg_type =%d", msg_head->msg_len, msg_head->msg_type); */
+    SWSS_LOG_NOTICE("Mclagsycnd send msg to iccpd, msg_len =%d, msg_type =%d", msg_head->msg_len, msg_head->msg_type);
 
     write =::write(m_connectionSocket, info_start, msg_head->msg_len);
 
@@ -419,7 +425,7 @@ uint64_t MclagLink::readData()
 
     if (read == 0)
     {
-        SWSS_LOG_DEBUG("Read data error! connection lost?\n");
+        SWSS_LOG_NOTICE("Read data error! connection lost?\n");
         return 0;
     }
 
@@ -444,7 +450,7 @@ uint64_t MclagLink::readData()
 
         msg = ((char *)hdr) + MCLAG_MSG_HDR_LEN;
 
-        SWSS_LOG_DEBUG("hdr->msg_type:%d\n", hdr->msg_type);
+        SWSS_LOG_NOTICE("hdr->msg_type:%d\n", hdr->msg_type);
         switch (hdr->msg_type)
         {
             case MCLAG_MSG_TYPE_PORT_ISOLATE:
@@ -549,7 +555,7 @@ void MclagServerLink::accept()
     if (connect_socket < 0)
         throw system_error(errno, system_category());
 
-    SWSS_LOG_DEBUG("New connection(fd:%d) accepted from: %s", connect_socket, inet_ntoa(client_addr.sin_addr));
+    SWSS_LOG_NOTICE("New connection(fd:%d) accepted from: %s", connect_socket, inet_ntoa(client_addr.sin_addr));
 
     link = new MclagLink(connect_socket);
     m_linkList.push_back(link);
@@ -579,7 +585,7 @@ void MclagFdbGather::doTask(Consumer &consumer)
 
     auto table = consumer.getTableName();
 
-    SWSS_LOG_DEBUG("Get task from table %s", table.c_str());
+    SWSS_LOG_NOTICE("Get task from table %s", table.c_str());
 
     if (table == STATE_FDB_TABLE_NAME)
     {
@@ -642,7 +648,7 @@ void MclagFdbGather::storeFdbChange(Consumer &consumer)
                 }
             }
 
-            SWSS_LOG_DEBUG("Rcv msg from STATE_FDB_DB to add fdb(mac:%s, vid:%d, port_name:%s, type:%s).",
+            SWSS_LOG_NOTICE("Rcv msg from STATE_FDB_DB to add fdb(mac:%s, vid:%d, port_name:%s, type:%s).",
                            mac.c_str(), vlan_id, port_name.c_str(), type.c_str());
 
             fdb.port_name = port_name;
@@ -668,7 +674,7 @@ void MclagFdbGather::storeFdbChange(Consumer &consumer)
         }
         else if (op == DEL_COMMAND)
         {
-            SWSS_LOG_DEBUG("Rcv msg from STATE_FDB_DB to del fdb(mac:%s, vid:%d)", mac.c_str(), vlan_id);
+            SWSS_LOG_NOTICE("Rcv msg from STATE_FDB_DB to del fdb(mac:%s, vid:%d)", mac.c_str(), vlan_id);
             if (exist)
             {
                 op_type = MCLAG_FDB_OPER_DEL;
@@ -744,7 +750,7 @@ void MclagFdbGather::getFdbFromStatedb()
         }
         type = type_it->second;
 
-        SWSS_LOG_DEBUG("Read fdb entry(mac:%s, vid:%d, port_name:%s, type:%s) from STATE_FDB_TABLE and record it locally.",
+        SWSS_LOG_NOTICE("Read fdb entry(mac:%s, vid:%d, port_name:%s, type:%s) from STATE_FDB_TABLE and record it locally.",
                        mac.c_str(), vid, port_name.c_str(), type.c_str());
 
         m_fdbEvent.push_back(mclag_fdb(mac, vid, port_name, type, MCLAG_FDB_OPER_ADD));

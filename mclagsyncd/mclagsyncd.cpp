@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 
                 if (ret == Select::ERROR)
                 {
-                    SWSS_LOG_ERROR("Error: %s!", strerror(errno));
+                    SWSS_LOG_NOTICE("Error: %s!", strerror(errno));
                     continue;
                 }
 
